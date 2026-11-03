@@ -168,11 +168,6 @@ export class LocalWatchManager {
         task.terminalHandled = true;
         this.cancel(watchId);
 
-        let exitCode: number | null = null;
-        if (task.config.exit_code_path) {
-          exitCode = await this.tryReadExitCode(task.config.exit_code_path);
-        }
-
         const finishEvent: WatchFinishEvent = {
           event: "finish",
           watch_id: task.config.watch_id,
@@ -180,7 +175,6 @@ export class LocalWatchManager {
           process_count: task.processes.size,
           observed_at: nowIso,
           state_file: task.statePath,
-          exit_code: exitCode,
         };
         this.onTerminal(task.config, finishEvent);
       }
@@ -270,16 +264,5 @@ export class LocalWatchManager {
     const tempPath = join(dir, `.${task.config.watch_id}.${Date.now()}.tmp`);
     await fs.writeFile(tempPath, JSON.stringify(state, null, 2), { encoding: "utf8", mode: 0o600 });
     await fs.rename(tempPath, task.statePath);
-  }
-
-  /** 尝试读取退出码文件 */
-  private async tryReadExitCode(path: string): Promise<number | null> {
-    try {
-      const text = await fs.readFile(path, "utf8");
-      const code = Number(text.trim());
-      return Number.isInteger(code) ? code : null;
-    } catch {
-      return null;
-    }
   }
 }

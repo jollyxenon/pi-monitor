@@ -17,8 +17,6 @@ export const MAX_LIST_LIMIT = 100;
 export const MAX_DESCRIPTION = 2000;
 /** note 长度上限 */
 export const MAX_NOTE = 2000;
-/** tmux session 名称长度上限 */
-export const MAX_SESSION_NAME = 256;
 /** 路径列表最大项数 */
 export const MAX_PATHS = 20;
 /** 单个路径长度上限 */
@@ -43,9 +41,6 @@ export function validateWatchInput(input: WatchInput): string | undefined {
   if ((input.note?.length ?? 0) > MAX_NOTE) {
     return `note 最多 ${MAX_NOTE} 字符`;
   }
-  if ((input.tmux_session?.length ?? 0) > MAX_SESSION_NAME) {
-    return `tmux_session 最多 ${MAX_SESSION_NAME} 字符`;
-  }
   for (const [name, paths] of [
     ["result_paths", input.result_paths],
     ["log_paths", input.log_paths],
@@ -56,9 +51,6 @@ export function validateWatchInput(input: WatchInput): string | undefined {
     if (paths?.some((path) => path.length > MAX_PATH_LENGTH)) {
       return `${name} 每项最多 ${MAX_PATH_LENGTH} 字符`;
     }
-  }
-  if (input.exit_code_path && input.exit_code_path.length > MAX_PATH_LENGTH) {
-    return `exit_code_path 最多 ${MAX_PATH_LENGTH} 字符`;
   }
   if (
     input.interval_seconds !== undefined &&
@@ -83,8 +75,6 @@ export function normalizeWatchConfig(
     ...(input.description === undefined ? {} : { description: input.description }),
     log_paths: [...(input.log_paths ?? [])],
     result_paths: [...(input.result_paths ?? [])],
-    ...(input.exit_code_path === undefined ? {} : { exit_code_path: input.exit_code_path }),
-    ...(input.tmux_session === undefined ? {} : { tmux_session: input.tmux_session }),
     interval_seconds: input.interval_seconds ?? DEFAULT_INTERVAL_SECONDS,
     ...(input.note === undefined ? {} : { note: input.note }),
     resume,

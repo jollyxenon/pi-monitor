@@ -50,16 +50,6 @@ const WatchParameters = Type.Object({
       description: "预期的产物文件路径列表，任务结束后便于检查",
     }),
   ),
-  exit_code_path: Type.Optional(
-    Type.String({
-      description: "任务退出码文件路径（如 cmd; echo $? > .exit.txt），任务结束时会自动尝试读取",
-    }),
-  ),
-  tmux_session: Type.Optional(
-    Type.String({
-      description: "关联的 tmux session 名称（仅作元数据展示和方便后续定位）",
-    }),
-  ),
   interval_seconds: Type.Optional(
     Type.Number({
       exclusiveMinimum: 0,
@@ -227,20 +217,16 @@ Optional:
 - description: human-readable label for the task
 - log_paths: log files to inspect while or after running
 - result_paths: files expected to be produced by the task
-- exit_code_path: path to file storing command exit code (e.g. echo $? > .exit.txt)
-- tmux_session: name of the associated tmux session (metadata only)
 - interval_seconds: scan interval in seconds (default 2)
 - note: free-form note or instructions for the agent upon resumption`,
     promptSnippet:
       "Use when a time-consuming local task (build, test, compilation, heavy computation) is running on Linux/WSL and you want to be notified when it ends, instead of blocking bash.",
     promptGuidelines: [
       "pi_watch monitors the termination of a local Linux/WSL process tree and steers the agent back when the entire process tree ends.",
-      "NEVER block the bash tool with long-running commands (e.g. cargo build, npm run build, pytest, heavy scripts). Always launch them asynchronously and monitor via pi_watch.",
-      "Launch Template A (Background & nohup): run `cmd > build.log 2>&1; echo $? > .build.exit & echo PID=$!` in bash. Capture the printed PID and call pi_watch with pid, log_paths: [\"build.log\"], and exit_code_path: \".build.exit\".",
-      "Launch Template B (Dedicated single-command tmux): run `tmux new-session -d -s <name> 'cmd > build.log 2>&1; echo $? > .build.exit'` then get PID via `tmux display-message -p -t <name> '#{pane_pid}'`. Call pi_watch with pid, tmux_session: \"<name>\", exit_code_path, and log_paths.",
-      "DO NOT use `send-keys` to an existing interactive tmux pane and monitor that pane's PID. The interactive shell (bash/zsh) remains alive after the command finishes and will never trigger completion.",
+      "NEVER block the bash tool with long-running commands (e.g. training scripts, cargo build, npm run build, heavy preprocessing). Always launch them asynchronously in background and monitor via pi_watch.",
+      "To launch: run `nohup <cmd> > /path/to/out.log 2>&1 & echo PID=$!` (or simply `<cmd> > /path/to/out.log 2>&1 & echo $!`) in bash, capture the printed PID, then call pi_watch with that pid and log_paths.",
       "After calling pi_watch, conclude your turn or proceed with other independent tasks immediately. The monitor will autonomously deliver a steer message waking you up when the task finishes.",
-      "When awakened by a steer event, inspect the exit code (if exit_code_path was provided) and log_paths to verify task results before proceeding.",
+      "When awakened by a steer event, inspect log_paths and result_paths to verify task results before proceeding.",
     ],
     parameters: WatchParameters,
     async execute(_toolCallId, rawParams): Promise<PiToolResult> {
@@ -286,12 +272,11 @@ Optional:
       }
 
       const descLine = config.description ? ` (${config.description})` : "";
-      const tmuxLine = config.tmux_session ? ` [tmux: ${config.tmux_session}]` : "";
       return {
         content: [
           {
             type: "text",
-            text: `已建立本地进程监控: PID ${config.pid}${descLine}${tmuxLine}\nwatch_id: ${watchId}\n任务结束后将自动通过 steer 唤醒 Agent。`,
+            text: `已建立本地进程监控: PID ${config.pid}${descLine}\nwatch_id: ${watchId}\n任务结束后将自动通过 steer 唤醒 Agent。`,
           },
         ],
         details: { watch_id: watchId, status: "started" },
@@ -370,7 +355,6 @@ Optional:
         root_pid: s.config.pid,
         description: s.config.description,
         updated_at: s.updated_at,
-        tmux_session: s.config.tmux_session,
         note: s.config.note,
       });
 
@@ -381,8 +365,7 @@ Optional:
       } else {
         for (const s of shownActive) {
           const desc = s.config.description ? ` - ${s.config.description}` : "";
-          const tmux = s.config.tmux_session ? ` [tmux: ${s.config.tmux_session}]` : "";
-          lines.push(`  • ${s.config.watch_id}: PID ${s.config.pid}${desc}${tmux} (${s.updated_at})`);
+          lines.push(`  • ${s.config.watch_id}: PID ${s.config.pid}${desc} (${s.updated_at})`);
         }
       }
 

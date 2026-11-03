@@ -14,10 +14,6 @@ export interface WatchInput {
   log_paths?: string[] | undefined;
   /** 预期的产物文件路径列表 */
   result_paths?: string[] | undefined;
-  /** 退出状态码记录文件的路径（任务结束时若存在会自动读取） */
-  exit_code_path?: string | undefined;
-  /** 关联的 tmux session 名称（仅作元数据展示） */
-  tmux_session?: string | undefined;
   /** 扫描间隔秒数，默认 2 秒 */
   interval_seconds?: number | undefined;
   /** 补充说明或后续备忘 */
@@ -43,8 +39,6 @@ export interface WatchConfig {
   description?: string | undefined;
   log_paths: string[];
   result_paths: string[];
-  exit_code_path?: string | undefined;
-  tmux_session?: string | undefined;
   interval_seconds: number;
   note?: string | undefined;
   resume: boolean;
@@ -73,7 +67,6 @@ export interface WatchFinishEvent {
   process_count: number;
   observed_at: string;
   state_file: string;
-  exit_code?: number | null | undefined;
 }
 
 /** 异常中断终态事件 */
@@ -118,7 +111,6 @@ export interface WatchSummary {
   root_pid: number;
   description?: string | undefined;
   updated_at: string;
-  tmux_session?: string | undefined;
   note?: string | undefined;
 }
 

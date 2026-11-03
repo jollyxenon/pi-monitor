@@ -6,7 +6,7 @@
   "keywords": [
     "pi-package",
     "process-monitoring",
-    "tmux",
+    "background-tasks",
     "local-tasks"
   ],
   "license": "MIT",

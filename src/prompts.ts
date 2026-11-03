@@ -17,11 +17,8 @@ export function buildTerminalPrompt(config: WatchConfig, event: TerminalEvent): 
     process_count: event.process_count,
     observed_at: event.observed_at,
     state_file: event.state_file,
-    exit_code: event.event === "finish" ? (event.exit_code ?? null) : null,
-    tmux_session: config.tmux_session ?? null,
     log_paths: config.log_paths,
     result_paths: config.result_paths,
-    exit_code_path: config.exit_code_path ?? null,
     note: config.note ?? null,
     ...(event.event === "interrupt"
       ? {
