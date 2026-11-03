@@ -26,19 +26,24 @@
 
 ### 安装
 
-作为当前项目的本地插件加载：
+从 GitHub 安装到全局（推荐）：
+```bash
+pi install git:github.com/jollyxenon/pi-monitor
+```
+
+仅在当前项目中安装：
+```bash
+pi install -l git:github.com/jollyxenon/pi-monitor
+```
+
+本地开发模式加载：
 ```bash
 pi install -l /home/xenon/pi-extension/pi-monitor
 ```
 
-或者作为全局扩展：
+临时试用（不写入配置）：
 ```bash
-pi install /home/xenon/pi-extension/pi-monitor
-```
-
-临时测试体验：
-```bash
-pi -e /home/xenon/pi-extension/pi-monitor
+pi -e git:github.com/jollyxenon/pi-monitor
 ```
 
 ---
