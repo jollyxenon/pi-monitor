@@ -20,7 +20,7 @@ interface ActiveWatchTask {
   config: WatchConfig;
   bootId: string;
   btime: number;
-  processes: Map<number, ProcessRecord>;
+  processes: Map<string, ProcessRecord>;
   timer?: NodeJS.Timeout | undefined;
   scanning: boolean;
   statePath: string;
@@ -90,6 +90,7 @@ export class LocalWatchManager {
   public cancel(watchId: string): void {
     const task = this.active.get(watchId);
     if (!task) return;
+    task.terminalHandled = true;
     if (task.timer) {
       clearInterval(task.timer);
       task.timer = undefined;
@@ -100,6 +101,7 @@ export class LocalWatchManager {
   /** 关闭所有正在运行的监控定时器（在 session 切换或重载时调用） */
   public closeAll(): void {
     for (const task of this.active.values()) {
+      task.terminalHandled = true;
       if (task.timer) {
         clearInterval(task.timer);
         task.timer = undefined;
@@ -137,27 +139,30 @@ export class LocalWatchManager {
         if (inspected.has(currentPid)) continue;
         inspected.add(currentPid);
 
-        const record = task.processes.get(currentPid);
-        if (!record || record.ended_at) continue;
-
         const children = await this.procReader.readChildren(currentPid);
         for (const childPid of children) {
-          if (!task.processes.has(childPid)) {
-            const childStat = await this.procReader.readProcessStat(childPid);
-            if (childStat && !ENDED_STATES.has(childStat.state)) {
+          const childStat = await this.procReader.readProcessStat(childPid);
+          if (childStat && !ENDED_STATES.has(childStat.state)) {
+            const childKey = `${childStat.pid}:${childStat.start_ticks}`;
+            if (!task.processes.has(childKey)) {
               this.rememberProcess(task, childStat);
               activePids.push(childPid);
               queue.push(childPid);
+            } else if (activePids.includes(childPid)) {
+              queue.push(childPid);
             }
-          } else if (activePids.includes(childPid)) {
-            queue.push(childPid);
           }
         }
       }
 
+      // 如果扫描期间任务已被取消或重置，直接放弃后续落盘与通知
+      if (this.active.get(watchId) !== task || task.terminalHandled) return;
+
       // 3. 判定是否已全部结束
       const isFinished = activePids.length === 0;
       await this.writeStateFile(task, isFinished ? "finish" : null);
+
+      if (this.active.get(watchId) !== task || task.terminalHandled) return;
 
       if (isFinished) {
         task.terminalHandled = true;
@@ -180,6 +185,7 @@ export class LocalWatchManager {
         this.onTerminal(task.config, finishEvent);
       }
     } catch (error) {
+      if (this.active.get(watchId) !== task || task.terminalHandled) return;
       task.terminalHandled = true;
       this.cancel(watchId);
 
@@ -210,7 +216,7 @@ export class LocalWatchManager {
       start_ticks: stat.start_ticks,
       started_at: startedAt,
     };
-    task.processes.set(stat.pid, record);
+    task.processes.set(`${stat.pid}:${stat.start_ticks}`, record);
     return record;
   }
 
@@ -239,7 +245,7 @@ export class LocalWatchManager {
         throw new WatcherInterruptError("boot_id_mismatch", "系统在会话断开期间发生过重启");
       }
       for (const p of data.processes) {
-        task.processes.set(p.pid, { ...p });
+        task.processes.set(`${p.pid}:${p.start_ticks}`, { ...p });
       }
     } catch (error) {
       if (error instanceof WatcherInterruptError) throw error;
