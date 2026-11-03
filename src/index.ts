@@ -219,11 +219,28 @@ export default function piMonitor(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "pi_watch",
     label: "Pi Local Watch",
-    description: "监控本地长时间运行的进程树。当目标任务及其所有子进程结束时，主动唤醒 Agent。",
-    promptSnippet: "用于在后台或 tmux 中运行本地耗时长任务（如构建或训练）时挂起监控，并在任务结束时自动唤醒 Agent。",
+    description: `Monitor a local long-running process tree (build, compile, train, data compute) and notify the local Pi Agent when it finishes.
+
+Required: pid (local root PID — capture it when launching the task).
+
+Optional:
+- description: human-readable label for the task
+- log_paths: log files to inspect while or after running
+- result_paths: files expected to be produced by the task
+- exit_code_path: path to file storing command exit code (e.g. echo $? > .exit.txt)
+- tmux_session: name of the associated tmux session (metadata only)
+- interval_seconds: scan interval in seconds (default 2)
+- note: free-form note or instructions for the agent upon resumption`,
+    promptSnippet:
+      "Use when a time-consuming local task (build, test, compilation, heavy computation) is running on Linux/WSL and you want to be notified when it ends, instead of blocking bash.",
     promptGuidelines: [
-      "本地长任务不要在 bash 工具中同步卡住等待，应将其放到后台（nohup 或 tmux）执行并获取 PID，然后调用 pi_watch 建立监控。",
-      "任务结束或中断后，pi_watch 将主动通过 steer 唤醒你，届时请检查日志、产物或退出码，并继续下一步。",
+      "pi_watch monitors the termination of a local Linux/WSL process tree and steers the agent back when the entire process tree ends.",
+      "NEVER block the bash tool with long-running commands (e.g. cargo build, npm run build, pytest, heavy scripts). Always launch them asynchronously and monitor via pi_watch.",
+      "Launch Template A (Background & nohup): run `cmd > build.log 2>&1; echo $? > .build.exit & echo PID=$!` in bash. Capture the printed PID and call pi_watch with pid, log_paths: [\"build.log\"], and exit_code_path: \".build.exit\".",
+      "Launch Template B (Dedicated single-command tmux): run `tmux new-session -d -s <name> 'cmd > build.log 2>&1; echo $? > .build.exit'` then get PID via `tmux display-message -p -t <name> '#{pane_pid}'`. Call pi_watch with pid, tmux_session: \"<name>\", exit_code_path, and log_paths.",
+      "DO NOT use `send-keys` to an existing interactive tmux pane and monitor that pane's PID. The interactive shell (bash/zsh) remains alive after the command finishes and will never trigger completion.",
+      "After calling pi_watch, conclude your turn or proceed with other independent tasks immediately. The monitor will autonomously deliver a steer message waking you up when the task finishes.",
+      "When awakened by a steer event, inspect the exit code (if exit_code_path was provided) and log_paths to verify task results before proceeding.",
     ],
     parameters: WatchParameters,
     async execute(_toolCallId, rawParams): Promise<PiToolResult> {
